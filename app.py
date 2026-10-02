@@ -41,10 +41,18 @@ st.sidebar.header("Student Parameters")
 def user_input_features():
     input_data = {}
     for feature in feature_names:
-        input_data[feature] = st.sidebar.number_input(
-            f"Enter {feature}", 
-            value=0.0
-        )
+        # User-friendly ranges & step sizes
+        clean_label = feature.replace("_", " ").title()
+        
+        if "cgpa" in feature.lower():
+            input_data[feature] = st.sidebar.number_input(f"Enter {clean_label} (0 - 10)", min_value=0.0, max_value=10.0, value=7.5, step=0.1)
+        elif "percentage" in feature.lower() or "score" in feature.lower():
+            input_data[feature] = st.sidebar.number_input(f"Enter {clean_label} (0 - 100)", min_value=0.0, max_value=100.0, value=70.0, step=1.0)
+        elif "backlog" in feature.lower() or "internship" in feature.lower() or "project" in feature.lower():
+            input_data[feature] = st.sidebar.number_input(f"Enter {clean_label}", min_value=0, max_value=20, value=0, step=1)
+        else:
+            input_data[feature] = st.sidebar.number_input(f"Enter {clean_label}", value=0.0, step=1.0)
+            
     return pd.DataFrame([input_data])
 
 input_df = user_input_features()
@@ -70,5 +78,3 @@ if st.button("Predict Placement Status"):
             
     except Exception as e:
         st.error(f"Prediction Error: {e}")
-            
-
