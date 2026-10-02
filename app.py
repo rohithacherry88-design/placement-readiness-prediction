@@ -1,6 +1,6 @@
 import streamlit as st
 import pandas as pd
-import pickle
+import joblib
 import os
 
 # Page Configuration
@@ -14,22 +14,18 @@ st.set_page_config(
 st.title("🎓 Placement Readiness & Risk Prediction System")
 st.markdown("Enter student details below to check placement readiness and risk assessment.")
 
-# Load Model Artifacts directly from current working directory
+# Load Model Artifacts using Joblib
 @st.cache_resource
 def load_artifacts():
-    # Direct paths without models/ folder dependency
     model_path = "placement_model.pkl"
     features_path = "feature_names.pkl"
     
     if not os.path.exists(model_path) or not os.path.exists(features_path):
-        st.error("Model files not found in the repository! Please ensure placement_model.pkl and feature_names.pkl exist.")
+        st.error("Model files not found! Please ensure placement_model.pkl and feature_names.pkl are uploaded.")
         st.stop()
         
-    with open(model_path, "rb") as f:
-        model = pickle.load(f)
-        
-    with open(features_path, "rb") as f:
-        feature_names = pickle.load(f)
+    model = joblib.load(model_path)
+    feature_names = joblib.load(features_path)
         
     return model, feature_names
 
@@ -43,7 +39,6 @@ except Exception as e:
 st.sidebar.header("Student Parameters")
 
 def user_input_features():
-    # Dynamic form fields matching model feature names
     input_data = {}
     for feature in feature_names:
         input_data[feature] = st.sidebar.number_input(
@@ -75,4 +70,5 @@ if st.button("Predict Placement Status"):
             
     except Exception as e:
         st.error(f"Prediction Error: {e}")
+            
 
