@@ -1,69 +1,78 @@
-import os
-import joblib
-import pandas as pd
 import streamlit as st
+import pandas as pd
+import pickle
+import os
 
-st.set_page_config(page_title="Placement Readiness & Risk Prediction", page_icon="🎓", layout="wide")
+# Page Configuration
+st.set_page_config(
+    page_title="Placement Readiness & Risk Prediction",
+    page_icon="🎓",
+    layout="wide"
+)
 
-# Paths check
-model_path = 'models/placement_model.pkl'
-features_path = 'models/feature_names.pkl'
+# Header Section
+st.title("🎓 Placement Readiness & Risk Prediction System")
+st.markdown("Enter student details below to check placement readiness and risk assessment.")
 
-if not os.path.exists(model_path):
-    model_path = 'data/models/placement_model.pkl'
-    features_path = 'data/models/feature_names.pkl'
-
+# Load Model Artifacts directly from current working directory
 @st.cache_resource
-def load_ml_model():
-    model = joblib.load(model_path)
-    features = joblib.load(features_path)
-    return model, features
+def load_artifacts():
+    # Direct paths without models/ folder dependency
+    model_path = "placement_model.pkl"
+    features_path = "feature_names.pkl"
+    
+    if not os.path.exists(model_path) or not os.path.exists(features_path):
+        st.error("Model files not found in the repository! Please ensure placement_model.pkl and feature_names.pkl exist.")
+        st.stop()
+        
+    with open(model_path, "rb") as f:
+        model = pickle.load(f)
+        
+    with open(features_path, "rb") as f:
+        feature_names = pickle.load(f)
+        
+    return model, feature_names
 
 try:
-    model, feature_names = load_ml_model()
+    model, feature_names = load_artifacts()
 except Exception as e:
-    st.error("Model files not found! Please run train_model.py first.")
+    st.error(f"Error loading model artifacts: {e}")
     st.stop()
 
-st.title("🎓 Placement Readiness & Risk Prediction System")
-st.write("Student academic and skill parameters enter chesi prediction metrics chudandi:")
-st.markdown("---")
+# User Inputs Form
+st.sidebar.header("Student Parameters")
 
-input_data = {}
-col1, col2 = st.columns(2)
+def user_input_features():
+    # Dynamic form fields matching model feature names
+    input_data = {}
+    for feature in feature_names:
+        input_data[feature] = st.sidebar.number_input(
+            f"Enter {feature}", 
+            value=0.0
+        )
+    return pd.DataFrame([input_data])
 
-for i, feature in enumerate(feature_names):
-    current_col = col1 if i % 2 == 0 else col2
-    f_lower = feature.lower()
-    
-    if 'cgpa' in f_lower:
-        input_data[feature] = current_col.number_input(f"Enter {feature}", min_value=0.0, max_value=10.0, value=7.5, step=0.1)
-    elif 'percentage' in f_lower or 'pct' in f_lower or 'score' in f_lower:
-        input_data[feature] = current_col.slider(f"Select {feature}", min_value=0.0, max_value=100.0, value=70.0)
-    elif 'backlog' in f_lower:
-        input_data[feature] = current_col.number_input(f"Active {feature}", min_value=0, max_value=10, value=0)
-    elif 'internship' in f_lower or 'project' in f_lower or 'certific' in f_lower:
-        input_data[feature] = current_col.number_input(f"Number of {feature}", min_value=0, max_value=10, value=1)
-    else:
-        input_data[feature] = current_col.number_input(f"Enter {feature}", min_value=0.0, value=50.0)
+input_df = user_input_features()
 
-st.markdown("---")
+# Display Input Data
+st.subheader("Selected Student Profile")
+st.dataframe(input_df)
 
-if st.button("🚀 Predict Placement Readiness", use_container_width=True):
-    input_df = pd.DataFrame([input_data])
-    prediction = model.predict(input_df)[0]
-    
-    if hasattr(model, "predict_proba"):
-        probabilities = model.predict_proba(input_df)[0]
-        confidence = probabilities[1] * 100 if len(probabilities) > 1 else probabilities[0] * 100
-    else:
-        confidence = 100.0 if prediction == 1 else 0.0
+# Predict Button
+if st.button("Predict Placement Status"):
+    try:
+        prediction = model.predict(input_df)[0]
+        prediction_proba = model.predict_proba(input_df)[0] if hasattr(model, "predict_proba") else None
+        
+        st.markdown("---")
+        if prediction == 1:
+            st.success("🎉 **Status:** Student is **Ready for Placement**!")
+        else:
+            st.warning("⚠️ **Status:** Student is **At Risk / Needs Improvement**.")
+            
+        if prediction_proba is not None:
+            st.write(f"**Confidence Score:** {max(prediction_proba)*100:.2f}%")
+            
+    except Exception as e:
+        st.error(f"Prediction Error: {e}")
 
-    st.subheader("📊 Evaluation Output:")
-    
-    if prediction == 1:
-        st.success(f"✅ **PLACEMENT READY!** (Placement Chance: **{confidence:.1f}%**)")
-        st.info("💡 **Recommendation:** Ready for placements.")
-    else:
-        st.error(f"⚠️ **HIGH RISK CATEGORY!** (Placement Chance: **{confidence:.1f}%**)")
-        st.warning("💡 **Action Required:** Focus on skill improvement & clearing backlogs.")
